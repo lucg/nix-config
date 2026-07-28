@@ -4,6 +4,7 @@
 AGENTS=(cursor claude gemini)
 MAX_NAME=63
 DEFAULT_KIT="@storeKit@"
+EXTRA_KITS=()
 
 template_for() {
   case "$1" in
@@ -26,14 +27,21 @@ die() {
 usage() {
   cat >&2 <<'EOF'
 usage:
-  sbxa [agent] [path]     create-or-attach (default path: cwd)
-  sbxa run [agent] [path] same as above
-  sbxa name [agent] [path] print derived sandbox name
-  sbxa ls                 list managed sandboxes (agent+…)
-  sbxa rm [agent|name]    remove sandbox for cwd, or by exact name
+  sbxa [--kit PATH]... [agent] [path]
+  sbxa run [--kit PATH]... [agent] [path]
+  sbxa name [agent] [path]
+  sbxa ls
+  sbxa rm [agent|name]
+
+On create, kits are stacked in order:
+  1. baked-in nix kit (override with SBXA_KIT)
+  2. each $workspace/sbx/*/spec.yaml directory (auto)
+  3. each path in SBXA_EXTRA_KITS (colon-separated)
+  4. each --kit PATH
 
 agents: cursor, claude, gemini
-env:    SBXA_KIT  override baked-in nix kit path
+env:    SBXA_KIT         override baked-in nix kit path
+        SBXA_EXTRA_KITS  extra kit paths (colon-separated)
 EOF
 }
 
@@ -156,6 +164,100 @@ kit_path() {
   printf '%s\n' "$kit"
 }
 
+# Parse --kit flags into EXTRA_KITS; remaining args go to POSITIONALS.
+parse_run_args() {
+  POSITIONALS=()
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --kit)
+        [[ -n "${2:-}" ]] || die "--kit requires a path"
+        EXTRA_KITS+=("$2")
+        shift 2
+        ;;
+      --kit=*)
+        EXTRA_KITS+=("${1#--kit=}")
+        shift
+        ;;
+      -h | --help)
+        usage
+        exit 0
+        ;;
+      --)
+        shift
+        POSITIONALS+=("$@")
+        break
+        ;;
+      -*)
+        die "unknown option: $1"
+        ;;
+      *)
+        POSITIONALS+=("$1")
+        shift
+        ;;
+    esac
+  done
+}
+
+discover_workspace_kits() {
+  local ws="$1"
+  local d
+  [[ -d "$ws/sbx" ]] || return 0
+  shopt -s nullglob
+  for d in "$ws/sbx"/*; do
+    if [[ -d "$d" && -f "$d/spec.yaml" ]]; then
+      printf '%s\n' "$d"
+    fi
+  done
+  shopt -u nullglob
+}
+
+normalize_kit_ref() {
+  local k="$1"
+  if [[ -d "$k" ]]; then
+    (cd "$k" && pwd -P)
+  elif [[ -f "$k" ]]; then
+    printf '%s/%s\n' "$(cd "$(dirname -- "$k")" && pwd -P)" "$(basename -- "$k")"
+  else
+    die "kit not found: $k"
+  fi
+}
+
+# Resolve create-time kit list: default nix + workspace sbx/* + env + --kit.
+collect_kits() {
+  local ws="$1"
+  local -a kits=()
+  local k path seen=""
+
+  kits+=("$(kit_path)")
+
+  while IFS= read -r k; do
+    [[ -n "$k" ]] || continue
+    kits+=("$k")
+  done < <(discover_workspace_kits "$ws")
+
+  if [[ -n "${SBXA_EXTRA_KITS:-}" ]]; then
+    local IFS=':'
+    # shellcheck disable=SC2086
+    for k in ${SBXA_EXTRA_KITS}; do
+      [[ -n "$k" ]] || continue
+      kits+=("$k")
+    done
+  fi
+
+  for k in "${EXTRA_KITS[@]}"; do
+    kits+=("$k")
+  done
+
+  for k in "${kits[@]}"; do
+    path=$(normalize_kit_ref "$k")
+    case ":$seen:" in
+      *":$path:"*) continue ;;
+    esac
+    seen="${seen}:${path}"
+    printf '%s\n' "$path"
+  done
+}
+
 cmd_ls() {
   sandbox_names | grep -E '^(cursor|claude|gemini)\+' || true
 }
@@ -195,7 +297,10 @@ cmd_rm() {
 }
 
 cmd_run() {
-  local agent path name kit template
+  local agent path name template
+  local -a kits=()
+  local -a cmd=()
+  local k
 
   if [[ -n "${1:-}" ]] && is_agent "$1"; then
     agent="$1"
@@ -214,19 +319,30 @@ cmd_run() {
   path=$(abs_path "$path")
 
   if name_exists "$name"; then
+    if ((${#EXTRA_KITS[@]} > 0)) || [[ -n "${SBXA_EXTRA_KITS:-}" ]]; then
+      printf 'sbxa: ignoring extra kits on attach (kits only apply at create)\n' >&2
+    fi
     printf 'sbxa: attaching %s\n' "$name" >&2
     exec sbx run --name "$name"
   fi
 
-  kit=$(kit_path)
+  while IFS= read -r k; do
+    [[ -n "$k" ]] || continue
+    kits+=("$k")
+  done < <(collect_kits "$path")
+
   template=$(template_for "$agent")
   printf 'sbxa: creating %s\n' "$name" >&2
-  exec sbx run \
-    --template "$template" \
-    --kit "$kit" \
-    --name "$name" \
-    "$agent" \
-    "$path"
+  for k in "${kits[@]}"; do
+    printf 'sbxa:   kit %s\n' "$k" >&2
+  done
+
+  cmd=(sbx run --template "$template" --name "$name")
+  for k in "${kits[@]}"; do
+    cmd+=(--kit "$k")
+  done
+  cmd+=("$agent" "$path")
+  exec "${cmd[@]}"
 }
 
 main() {
@@ -248,10 +364,12 @@ main() {
       ;;
     run)
       shift
-      cmd_run "$@"
+      parse_run_args "$@"
+      cmd_run "${POSITIONALS[@]}"
       ;;
     *)
-      cmd_run "$@"
+      parse_run_args "$@"
+      cmd_run "${POSITIONALS[@]}"
       ;;
   esac
 }

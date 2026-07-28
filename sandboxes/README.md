@@ -65,18 +65,31 @@ Note: `docker buildx bake` runs on the host (outside sbx network policy). Templa
 sbxa                  # pick agent, create-or-attach for cwd
 sbxa cursor           # cursor agent for cwd
 sbxa cursor ~/proj    # explicit workspace
+sbxa --kit ./sbx/espressif cursor
 sbxa name cursor      # print derived name
 sbxa ls               # list managed sandboxes (agent+…)
 sbxa rm cursor        # remove cursor sandbox for cwd
 sbxa rm cursor+nix-config.sbx-helper
 ```
 
-Names look like `cursor+nix-config.sbx-helper` (`{agent}+` + `$HOME`-relative path with `/` → `.`). If a sandbox with that name already exists (`sbx ls --json`), `sbxa` attaches with `sbx run --name`; otherwise it creates with the matching `nix-agent:*` template and the **store-pinned** `kits/nix` baked into the package.
+Names look like `cursor+nix-config.sbx-helper` (`{agent}+` + `$HOME`-relative path with `/` → `.`). If a sandbox with that name already exists (`sbx ls --json`), `sbxa` attaches with `sbx run --name`; otherwise it creates with the matching `nix-agent:*` template and stacked kits:
 
-Override the kit without rebuilding:
+1. Store-pinned `kits/nix` (override with `SBXA_KIT`)
+2. Each `$workspace/sbx/*/spec.yaml` directory (auto-discovered)
+3. Paths in `SBXA_EXTRA_KITS` (colon-separated)
+4. Each `--kit PATH`
 
 ```bash
+# project-local kits under ./sbx/ are picked up automatically
+mkdir -p sbx && cp -r ~/nix-config/sandboxes/kits/espressif sbx/
+sbxa cursor
+
+# or pass explicitly / via env
+sbxa --kit ./sbx/espressif --kit /path/to/other cursor
+SBXA_EXTRA_KITS=./sbx/espressif:/path/to/other sbxa cursor
+
+# live kit checkout without rebuilding sbxa
 SBXA_KIT=~/nix-config/sandboxes/kits/nix sbxa cursor
 ```
 
-There is no auto-prune; use `sbxa ls` / `sbxa rm` explicitly.
+Kits only apply at create time; attach ignores `--kit` / `SBXA_EXTRA_KITS`. There is no auto-prune; use `sbxa ls` / `sbxa rm` explicitly.
