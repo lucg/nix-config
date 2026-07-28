@@ -56,3 +56,27 @@ sbx run claude \
 Copy `kits/espressif` into a project as `sbx/espressif` when needed. Prefer kits over one-off `sbx policy allow network "..."`.
 
 Note: `docker buildx bake` runs on the host (outside sbx network policy). Template image builds may need outbound access to `install.determinate.systems`; that is unrelated to sandbox kit allowlists.
+
+## sbxa
+
+`sbxa` is a small helper (installed via the flake) that idempotently create-or-attaches nix-agent sandboxes for the current workspace.
+
+```bash
+sbxa                  # pick agent, create-or-attach for cwd
+sbxa cursor           # cursor agent for cwd
+sbxa cursor ~/proj    # explicit workspace
+sbxa name cursor      # print derived name
+sbxa ls               # list managed sandboxes (agent+…)
+sbxa rm cursor        # remove cursor sandbox for cwd
+sbxa rm cursor+nix-config.sbx-helper
+```
+
+Names look like `cursor+nix-config.sbx-helper` (`{agent}+` + `$HOME`-relative path with `/` → `.`). If a sandbox with that name already exists (`sbx ls --json`), `sbxa` attaches with `sbx run --name`; otherwise it creates with the matching `nix-agent:*` template and the **store-pinned** `kits/nix` baked into the package.
+
+Override the kit without rebuilding:
+
+```bash
+SBXA_KIT=~/nix-config/sandboxes/kits/nix sbxa cursor
+```
+
+There is no auto-prune; use `sbxa ls` / `sbxa rm` explicitly.
