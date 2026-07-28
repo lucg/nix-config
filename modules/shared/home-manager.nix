@@ -114,6 +114,11 @@ in
     };
   };
 
+  gh = {
+    enable = true;
+    extensions = [ pkgs.gh-worktree ];
+  };
+
   vim = {
     enable = true;
     plugins = with pkgs.vimPlugins; [

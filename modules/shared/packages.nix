@@ -54,7 +54,6 @@ with pkgs;
 
   # Development tools
   curl
-  gh
   terraform
   kubectl
   awscli2

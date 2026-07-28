@@ -44,6 +44,10 @@
       url = "github:cpick/nix-rosetta-builder";
       inputs.nixpkgs.follows = "nixpkgs";
     };
+    gh-worktree = {
+      url = "github:zmre/gh-worktree/20f8cbe9e0a2abba22db8fd0a70555ff05a82384";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs =
@@ -61,6 +65,7 @@
       nixpkgs-unstable,
       disko,
       nix-rosetta-builder,
+      gh-worktree,
     }@inputs:
     let
       user = "lucg";
@@ -77,6 +82,10 @@
           system = prev.stdenv.hostPlatform.system;
           config.allowUnfree = true;
         };
+      };
+      ghWorktreeOverlay = _final: prev: {
+        gh-worktree =
+          inputs.gh-worktree.packages.${prev.stdenv.hostPlatform.system}.gh-worktree;
       };
       devShell =
         system:
@@ -145,7 +154,10 @@
             nix-homebrew.darwinModules.nix-homebrew
             nix-rosetta-builder.darwinModules.default
             {
-              nixpkgs.overlays = [ unstableOverlay ];
+              nixpkgs.overlays = [
+                unstableOverlay
+                ghWorktreeOverlay
+              ];
               nix-homebrew = {
                 inherit user;
                 enable = true;
@@ -178,7 +190,10 @@
             disko.nixosModules.disko
             home-manager.nixosModules.home-manager
             {
-              nixpkgs.overlays = [ unstableOverlay ];
+              nixpkgs.overlays = [
+                unstableOverlay
+                ghWorktreeOverlay
+              ];
               home-manager = {
                 useGlobalPkgs = true;
                 useUserPackages = true;
