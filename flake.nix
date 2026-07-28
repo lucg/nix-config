@@ -84,7 +84,8 @@
         };
       };
       ghWorktreeOverlay = _final: prev: {
-        gh-worktree = inputs.gh-worktree.packages.${prev.system}.gh-worktree;
+        gh-worktree =
+          inputs.gh-worktree.packages.${prev.stdenv.hostPlatform.system}.gh-worktree;
       };
       devShell =
         system:
