@@ -11,6 +11,8 @@ in
     name = "sbxa";
     runtimeInputs = with super; [
       coreutils
+      gnugrep
+      gnused
       jq
     ];
     text = lib.replaceStrings [ "@storeKit@" ] [ (toString nixKit) ] (

@@ -47,7 +47,9 @@ EOF
 
 sandbox_names() {
   command -v sbx >/dev/null 2>&1 || die "sbx not found on PATH"
-  sbx ls --json | jq -r '.. | objects | select(has("name")) | .name' | sort -u
+  local json
+  json=$(sbx ls --json) || die "sbx ls --json failed"
+  jq -r '.. | objects | select(has("name")) | .name' <<<"$json" | sort -u
 }
 
 name_exists() {
@@ -236,9 +238,9 @@ collect_kits() {
   done < <(discover_workspace_kits "$ws")
 
   if [[ -n "${SBXA_EXTRA_KITS:-}" ]]; then
-    local IFS=':'
-    # shellcheck disable=SC2086
-    for k in ${SBXA_EXTRA_KITS}; do
+    local -a extra=()
+    IFS=':' read -r -a extra <<<"${SBXA_EXTRA_KITS}"
+    for k in "${extra[@]}"; do
       [[ -n "$k" ]] || continue
       kits+=("$k")
     done

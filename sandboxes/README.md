@@ -59,7 +59,7 @@ Note: `docker buildx bake` runs on the host (outside sbx network policy). Templa
 
 ## sbxa
 
-`sbxa` is a small helper (installed via the flake) that idempotently create-or-attaches nix-agent sandboxes for the current workspace.
+`sbxa` is a small helper (installed via the flake) that idempotently creates or attaches nix-agent sandboxes for the current workspace.
 
 ```bash
 sbxa                  # pick agent, create-or-attach for cwd
