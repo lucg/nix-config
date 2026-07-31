@@ -1,6 +1,8 @@
 # sbxa — idempotent create-or-attach for nix-agent sandboxes.
 # Packaged via writeShellApplication; @storeKit@ is substituted at build time.
 
+set -euo pipefail
+
 AGENTS=(cursor claude gemini)
 MAX_NAME=63
 DEFAULT_KIT="@storeKit@"
@@ -59,11 +61,10 @@ name_exists() {
 
 abs_path() {
   local p="$1"
-  if [[ -d "$p" ]]; then
-    (cd "$p" && pwd -P)
-  else
-    die "workspace is not a directory: $p"
-  fi
+  local resolved
+  [[ -d "$p" ]] || die "workspace is not a directory: $p"
+  resolved=$(cd "$p" && pwd -P) || die "cannot access workspace: $p"
+  printf '%s\n' "$resolved"
 }
 
 path_slug() {
@@ -215,10 +216,13 @@ discover_workspace_kits() {
 
 normalize_kit_ref() {
   local k="$1"
+  local dir resolved
   if [[ -d "$k" ]]; then
-    (cd "$k" && pwd -P)
+    resolved=$(cd "$k" && pwd -P) || die "cannot access kit directory: $k"
+    printf '%s\n' "$resolved"
   elif [[ -f "$k" ]]; then
-    printf '%s/%s\n' "$(cd "$(dirname -- "$k")" && pwd -P)" "$(basename -- "$k")"
+    dir=$(cd "$(dirname -- "$k")" && pwd -P) || die "cannot access kit path: $k"
+    printf '%s/%s\n' "$dir" "$(basename -- "$k")"
   else
     die "kit not found: $k"
   fi
