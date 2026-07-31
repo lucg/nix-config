@@ -25,6 +25,7 @@ with pkgs;
   # Cloud-related tools and SDKs
   docker
   docker-compose
+  sbxa
 
   # Media-related packages
   dejavu_fonts
