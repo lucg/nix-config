@@ -81,7 +81,7 @@ path_slug() {
   fi
 
   local slug="${rel//\//.}"
-  # sbx names: letters, numbers, hyphens, underscores, periods, plus
+  # sbx names: letters, numbers, hyphens, underscores, periods
   slug=$(printf '%s' "$slug" | tr -c 'A-Za-z0-9._-' '-' | sed -E 's/-+/-/g; s/^-+//; s/-+$//; s/^\.+//; s/\.+$//')
   if [[ -z "$slug" ]]; then
     slug="workspace"
@@ -100,7 +100,7 @@ derive_name() {
 
   abs=$(abs_path "$workspace")
   slug=$(path_slug "$abs")
-  full="${agent}+${slug}"
+  full="${agent}.${slug}"
 
   if ((${#full} <= MAX_NAME)); then
     printf '%s\n' "$full"
@@ -108,7 +108,7 @@ derive_name() {
   fi
 
   hash=$(path_hash "$abs")
-  prefix="${agent}+"
+  prefix="${agent}."
   suffix=".${hash}"
   budget=$((MAX_NAME - ${#prefix} - ${#suffix}))
   if ((budget < 1)); then
@@ -265,7 +265,7 @@ collect_kits() {
 }
 
 cmd_ls() {
-  sandbox_names | grep -E '^(cursor|claude|gemini)\+' || true
+  sandbox_names | grep -E '^(cursor|claude|gemini)\.' || true
 }
 
 cmd_name() {
@@ -290,7 +290,7 @@ cmd_rm() {
   if [[ -z "$target" ]]; then
     agent=$(select_agent)
     name=$(derive_name "$agent" ".")
-  elif [[ "$target" == *+* ]]; then
+  elif [[ "$target" == *.* ]]; then
     name="$target"
   elif is_agent "$target"; then
     name=$(derive_name "$target" ".")
