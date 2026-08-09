@@ -16,6 +16,8 @@ in
   nix = {
     package = pkgs.nix;
 
+    channel.enable = false;
+
     settings = {
       trusted-users = [
         "@admin"
