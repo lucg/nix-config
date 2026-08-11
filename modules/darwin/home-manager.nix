@@ -56,6 +56,7 @@ in
       "copilot" = 1447330651;
       "vimlike" = 1584519802;
       "pages" = 409201541;
+      "amphetamine" = 937984704;
     };
   };
 
