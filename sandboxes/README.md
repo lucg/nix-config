@@ -67,12 +67,12 @@ sbxa cursor           # cursor agent for cwd
 sbxa cursor ~/proj    # explicit workspace
 sbxa --kit ./sbx/espressif cursor
 sbxa name cursor      # print derived name
-sbxa ls               # list managed sandboxes (agent+…)
+sbxa ls               # list managed sandboxes (agent.…)
 sbxa rm cursor        # remove cursor sandbox for cwd
-sbxa rm cursor+nix-config.sbx-helper
+sbxa rm cursor.nix-config.sbx-helper
 ```
 
-Names look like `cursor+nix-config.sbx-helper` (`{agent}+` + path with `/` → `.`). Under `$HOME`, the path is home-relative; outside `$HOME`, it is root-relative (leading `/` stripped). If a sandbox with that name already exists (`sbx ls --json`), `sbxa` attaches with `sbx run --name`; otherwise it creates with the matching `nix-agent:*` template and stacked kits:
+Names look like `cursor.nix-config.sbx-helper` (`{agent}.` + path with `/` → `.`). Under `$HOME`, the path is home-relative; outside `$HOME`, it is root-relative (leading `/` stripped). If a sandbox with that name already exists (`sbx ls --json`), `sbxa` attaches with `sbx run --name`; otherwise it creates with the matching `nix-agent:*` template and stacked kits:
 
 1. Store-pinned `kits/nix` (override with `SBXA_KIT`)
 2. Each `$workspace/sbx/*/spec.yaml` directory (auto-discovered)
