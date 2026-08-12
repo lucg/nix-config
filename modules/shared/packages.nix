@@ -89,6 +89,7 @@ with pkgs;
   openfpgaloader
   pulseview
   yosys
+  klayout
 
   # LaTeX
   texlive.combined.scheme-full
