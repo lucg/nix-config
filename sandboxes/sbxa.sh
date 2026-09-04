@@ -7,6 +7,7 @@ AGENTS=(cursor claude gemini)
 MAX_NAME=63
 DEFAULT_KIT="@storeKit@"
 EXTRA_KITS=()
+AGENT_ARGS=()
 
 template_for() {
   case "$1" in
@@ -29,8 +30,8 @@ die() {
 usage() {
   cat >&2 <<'EOF'
 usage:
-  sbxa [--kit PATH]... [agent] [path]
-  sbxa run [--kit PATH]... [agent] [path]
+  sbxa [--kit PATH]... [agent] [path] [-- AGENT_ARGS...]
+  sbxa run [--kit PATH]... [agent] [path] [-- AGENT_ARGS...]
   sbxa name [agent] [path]
   sbxa ls
   sbxa rm [agent|name]
@@ -40,6 +41,9 @@ On create, kits are stacked in order:
   2. each $workspace/sbx/*/spec.yaml directory (auto)
   3. each path in SBXA_EXTRA_KITS (colon-separated)
   4. each --kit PATH
+
+Anything after "--" is forwarded to the agent (sbx run ... -- AGENT_ARGS),
+on both create and attach, e.g.: sbxa claude -- --continue
 
 agents: cursor, claude, gemini
 env:    SBXA_KIT         override baked-in nix kit path
@@ -168,6 +172,7 @@ kit_path() {
 }
 
 # Parse --kit flags into EXTRA_KITS; remaining args go to POSITIONALS.
+# Everything after "--" is collected into AGENT_ARGS for the agent.
 parse_run_args() {
   POSITIONALS=()
   while [[ $# -gt 0 ]]; do
@@ -187,7 +192,7 @@ parse_run_args() {
         ;;
       --)
         shift
-        POSITIONALS+=("$@")
+        AGENT_ARGS+=("$@")
         break
         ;;
       -*)
@@ -329,7 +334,11 @@ cmd_run() {
       printf 'sbxa: ignoring extra kits on attach (kits only apply at create)\n' >&2
     fi
     printf 'sbxa: attaching %s\n' "$name" >&2
-    exec sbx run --name "$name"
+    cmd=(sbx run --name "$name")
+    if ((${#AGENT_ARGS[@]} > 0)); then
+      cmd+=(-- "${AGENT_ARGS[@]}")
+    fi
+    exec "${cmd[@]}"
   fi
 
   while IFS= read -r k; do
@@ -348,6 +357,9 @@ cmd_run() {
     cmd+=(--kit "$k")
   done
   cmd+=("$agent" "$path")
+  if ((${#AGENT_ARGS[@]} > 0)); then
+    cmd+=(-- "${AGENT_ARGS[@]}")
+  fi
   exec "${cmd[@]}"
 }
 

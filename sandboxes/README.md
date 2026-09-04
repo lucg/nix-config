@@ -70,7 +70,11 @@ sbxa name cursor      # print derived name
 sbxa ls               # list managed sandboxes (agent.…)
 sbxa rm cursor        # remove cursor sandbox for cwd
 sbxa rm cursor.nix-config.sbx-helper
+sbxa claude -- --continue                       # forward args to the agent
+sbxa claude -- -p "run the tests and fix failures"
 ```
+
+Anything after `--` is passed through as `sbx run ... -- AGENT_ARGS`. This applies on both create and attach, so `sbxa claude -- --continue` resumes the last session in an existing sandbox.
 
 Names look like `cursor.nix-config.sbx-helper` (`{agent}.` + path with `/` → `.`). Under `$HOME`, the path is home-relative; outside `$HOME`, it is root-relative (leading `/` stripped). If a sandbox with that name already exists (`sbx ls --json`), `sbxa` attaches with `sbx run --name`; otherwise it creates with the matching `nix-agent:*` template and stacked kits:
 
