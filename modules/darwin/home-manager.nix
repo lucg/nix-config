@@ -57,6 +57,7 @@ in
       "vimlike" = 1584519802;
       "pages" = 409201541;
       "amphetamine" = 937984704;
+      "wifi-explorer-scanner" = 494803304;
     };
   };
 
