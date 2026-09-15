@@ -7,6 +7,8 @@ AGENTS=(cursor claude gemini)
 MAX_NAME=63
 DEFAULT_KIT="@storeKit@"
 EXTRA_KITS=()
+AGENT_ARGS=()
+CLONE=0
 
 template_for() {
   case "$1" in
@@ -29,17 +31,27 @@ die() {
 usage() {
   cat >&2 <<'EOF'
 usage:
-  sbxa [--kit PATH]... [agent] [path]
-  sbxa run [--kit PATH]... [agent] [path]
-  sbxa name [agent] [path]
+  sbxa [--clone] [--kit PATH]... [agent] [path] [-- AGENT_ARGS...]
+  sbxa run [--clone] [--kit PATH]... [agent] [path] [-- AGENT_ARGS...]
+  sbxa name [--clone] [agent] [path]
+  sbxa fetch [agent] [path]
   sbxa ls
-  sbxa rm [agent|name]
+  sbxa rm [--clone] [agent|name]
+
+Clone mode (--clone): the agent works in a private git clone inside the
+sandbox (sbx run --clone) instead of the bind-mounted workspace. Direct and
+clone sandboxes coexist under distinct names (agent.slug vs agent-clone.slug).
+Commits come back via "sbxa fetch", which runs git fetch sandbox-<name> in the
+host repo and lists the fetched branches.
 
 On create, kits are stacked in order:
   1. baked-in nix kit (override with SBXA_KIT)
   2. each $workspace/sbx/*/spec.yaml directory (auto)
   3. each path in SBXA_EXTRA_KITS (colon-separated)
   4. each --kit PATH
+
+Anything after "--" is forwarded to the agent (sbx run ... -- AGENT_ARGS),
+on both create and attach, e.g.: sbxa claude -- --continue
 
 agents: cursor, claude, gemini
 env:    SBXA_KIT         override baked-in nix kit path
@@ -82,7 +94,7 @@ path_slug() {
 
   local slug="${rel//\//.}"
   # sbx names: letters, numbers, hyphens, underscores, periods
-  slug=$(printf '%s' "$slug" | tr -c 'A-Za-z0-9._-' '-' | sed -E 's/-+/-/g; s/^-+//; s/-+$//; s/^\.+//; s/\.+$//')
+  slug=$(printf '%s' "$slug" | tr -c 'A-Za-z0-9._-' '-' | sed -E 's/-+/-/g; s/\.+/./g; s/^-+//; s/-+$//; s/^\.+//; s/\.+$//')
   if [[ -z "$slug" ]]; then
     slug="workspace"
   fi
@@ -93,11 +105,21 @@ path_hash() {
   printf '%s' "$1" | sha256sum | cut -c1-8
 }
 
+# Sandbox name prefix: "<agent>" in direct mode, "<agent>-clone" in clone mode.
+agent_label() {
+  if ((CLONE)); then
+    printf '%s-clone\n' "$1"
+  else
+    printf '%s\n' "$1"
+  fi
+}
+
 derive_name() {
-  local agent="$1"
+  local agent
   local workspace="$2"
   local abs slug full hash prefix suffix budget truncated
 
+  agent=$(agent_label "$1")
   abs=$(abs_path "$workspace")
   slug=$(path_slug "$abs")
   full="${agent}.${slug}"
@@ -167,11 +189,16 @@ kit_path() {
   printf '%s\n' "$kit"
 }
 
-# Parse --kit flags into EXTRA_KITS; remaining args go to POSITIONALS.
+# Parse --clone / --kit flags; remaining args go to POSITIONALS.
+# Everything after "--" is collected into AGENT_ARGS for the agent.
 parse_run_args() {
   POSITIONALS=()
   while [[ $# -gt 0 ]]; do
     case "$1" in
+      --clone)
+        CLONE=1
+        shift
+        ;;
       --kit)
         [[ -n "${2:-}" ]] || die "--kit requires a path"
         EXTRA_KITS+=("$2")
@@ -187,7 +214,7 @@ parse_run_args() {
         ;;
       --)
         shift
-        POSITIONALS+=("$@")
+        AGENT_ARGS+=("$@")
         break
         ;;
       -*)
@@ -264,23 +291,68 @@ collect_kits() {
   done
 }
 
+# Clone mode needs a git repository to clone from. Warn when the workspace is
+# a linked worktree: sbx clones from the read-only mount of the workspace
+# alone, so the .git pointer file may not resolve inside the sandbox.
+clone_preflight() {
+  local path="$1"
+  local common
+  git -C "$path" rev-parse --git-dir >/dev/null 2>&1 \
+    || die "--clone requires a git repository: $path"
+  common=$(git -C "$path" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
+  case "$common" in
+    "$path" | "$path/.git") ;;
+    *)
+      printf 'sbxa: warning: %s is a linked worktree (git dir: %s)\n' "$path" "$common" >&2
+      printf 'sbxa: warning: sbx clones from a read-only mount of the workspace only; if the clone fails, point --clone at the main checkout\n' >&2
+      ;;
+  esac
+}
+
+# Resolve [agent] [path] positionals into AGENT and WORKSPACE (unresolved path).
+resolve_agent_path() {
+  if (($# > 2)); then
+    die "unexpected arguments: ${*:3}"
+  fi
+  if [[ -n "${1:-}" ]] && is_agent "$1"; then
+    AGENT="$1"
+    WORKSPACE="${2:-.}"
+  elif [[ -n "${1:-}" && -z "${2:-}" && -d "$1" ]] && ! is_agent "$1"; then
+    AGENT=$(select_agent)
+    WORKSPACE="$1"
+  elif [[ -z "${1:-}" ]]; then
+    AGENT=$(select_agent)
+    WORKSPACE="."
+  else
+    AGENT=$(resolve_agent "$1")
+    WORKSPACE="${2:-.}"
+  fi
+}
+
 cmd_ls() {
-  sandbox_names | grep -E '^(cursor|claude|gemini)\.' || true
+  sandbox_names | grep -E '^(cursor|claude|gemini)(-clone)?\.' || true
 }
 
 cmd_name() {
-  local agent path
-  if [[ -n "${1:-}" ]] && is_agent "$1"; then
-    agent="$1"
-    path="${2:-.}"
-  elif [[ -n "${1:-}" && -z "${2:-}" && -d "$1" ]] && ! is_agent "$1"; then
-    agent=$(select_agent)
-    path="$1"
-  else
-    agent=$(resolve_agent "${1:-}")
-    path="${2:-.}"
-  fi
-  derive_name "$agent" "$path"
+  resolve_agent_path "$@"
+  derive_name "$AGENT" "$WORKSPACE"
+}
+
+cmd_fetch() {
+  local name path remote
+  CLONE=1
+  resolve_agent_path "$@"
+  name=$(derive_name "$AGENT" "$WORKSPACE")
+  path=$(abs_path "$WORKSPACE")
+  remote="sandbox-$name"
+
+  name_exists "$name" || die "sandbox not found: $name (create it with: sbxa --clone $AGENT $path)"
+  git -C "$path" remote get-url "$remote" >/dev/null 2>&1 \
+    || die "remote $remote not found in $path (is the sandbox running? sbx registers it on start)"
+
+  printf 'sbxa: fetching %s\n' "$remote" >&2
+  git -C "$path" fetch "$remote"
+  git -C "$path" branch -r --list "$remote/*"
 }
 
 cmd_rm() {
@@ -308,28 +380,21 @@ cmd_run() {
   local -a cmd=()
   local k
 
-  if [[ -n "${1:-}" ]] && is_agent "$1"; then
-    agent="$1"
-    path="${2:-.}"
-  elif [[ -n "${1:-}" && -z "${2:-}" && -d "$1" ]] && ! is_agent "$1"; then
-    agent=$(select_agent)
-    path="$1"
-  elif [[ -z "${1:-}" ]]; then
-    agent=$(select_agent)
-    path="."
-  else
-    die "unexpected arguments: $*"
-  fi
-
-  name=$(derive_name "$agent" "$path")
-  path=$(abs_path "$path")
+  resolve_agent_path "$@"
+  agent="$AGENT"
+  name=$(derive_name "$agent" "$WORKSPACE")
+  path=$(abs_path "$WORKSPACE")
 
   if name_exists "$name"; then
     if ((${#EXTRA_KITS[@]} > 0)) || [[ -n "${SBXA_EXTRA_KITS:-}" ]]; then
       printf 'sbxa: ignoring extra kits on attach (kits only apply at create)\n' >&2
     fi
     printf 'sbxa: attaching %s\n' "$name" >&2
-    exec sbx run --name "$name"
+    cmd=(sbx run --name "$name")
+    if ((${#AGENT_ARGS[@]} > 0)); then
+      cmd+=(-- "${AGENT_ARGS[@]}")
+    fi
+    exec "${cmd[@]}"
   fi
 
   while IFS= read -r k; do
@@ -338,16 +403,28 @@ cmd_run() {
   done < <(collect_kits "$path")
 
   template=$(template_for "$agent")
-  printf 'sbxa: creating %s\n' "$name" >&2
+  if ((CLONE)); then
+    clone_preflight "$path"
+    printf 'sbxa: creating %s (clone mode)\n' "$name" >&2
+  else
+    printf 'sbxa: creating %s\n' "$name" >&2
+  fi
   for k in "${kits[@]}"; do
     printf 'sbxa:   kit %s\n' "$k" >&2
   done
 
-  cmd=(sbx run --template "$template" --name "$name")
+  cmd=(sbx run)
+  if ((CLONE)); then
+    cmd+=(--clone)
+  fi
+  cmd+=(--template "$template" --name "$name")
   for k in "${kits[@]}"; do
     cmd+=(--kit "$k")
   done
   cmd+=("$agent" "$path")
+  if ((${#AGENT_ARGS[@]} > 0)); then
+    cmd+=(-- "${AGENT_ARGS[@]}")
+  fi
   exec "${cmd[@]}"
 }
 
@@ -362,11 +439,18 @@ main() {
       ;;
     rm)
       shift
-      cmd_rm "$@"
+      parse_run_args "$@"
+      cmd_rm "${POSITIONALS[@]}"
       ;;
     name)
       shift
-      cmd_name "$@"
+      parse_run_args "$@"
+      cmd_name "${POSITIONALS[@]}"
+      ;;
+    fetch)
+      shift
+      parse_run_args "$@"
+      cmd_fetch "${POSITIONALS[@]}"
       ;;
     run)
       shift
