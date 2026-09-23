@@ -291,22 +291,21 @@ collect_kits() {
   done
 }
 
-# Clone mode needs a git repository to clone from. Warn when the workspace is
-# a linked worktree: sbx clones from the read-only mount of the workspace
-# alone, so the .git pointer file may not resolve inside the sandbox.
+# sbx --clone only accepts the main working tree of a non-bare repository:
+# it rejects linked worktrees ("run from the main repository instead") and
+# bare repositories ("not in a Git repository"). Fail early with the reason.
 clone_preflight() {
   local path="$1"
-  local common
-  git -C "$path" rev-parse --git-dir >/dev/null 2>&1 \
+  local gitdir common
+  gitdir=$(git -C "$path" rev-parse --path-format=absolute --git-dir 2>/dev/null) \
     || die "--clone requires a git repository: $path"
+  if [[ "$(git -C "$path" rev-parse --is-bare-repository 2>/dev/null)" == "true" ]]; then
+    die "--clone needs a working tree; $path is a bare repository (sbx cannot clone it)"
+  fi
   common=$(git -C "$path" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) || return 0
-  case "$common" in
-    "$path" | "$path/.git") ;;
-    *)
-      printf 'sbxa: warning: %s is a linked worktree (git dir: %s)\n' "$path" "$common" >&2
-      printf 'sbxa: warning: sbx clones from a read-only mount of the workspace only; if the clone fails, point --clone at the main checkout\n' >&2
-      ;;
-  esac
+  if [[ "$gitdir" != "$common" ]]; then
+    die "--clone is rejected by sbx on linked worktrees; $path belongs to $common. Use the main working tree of a non-bare checkout, or run direct mode (sbxa $AGENT $path)"
+  fi
 }
 
 # Resolve [agent] [path] positionals into AGENT and WORKSPACE (unresolved path).
