@@ -70,7 +70,11 @@ sbxa name cursor      # print derived name
 sbxa ls               # list managed sandboxes (agent.…)
 sbxa rm cursor        # remove cursor sandbox for cwd
 sbxa rm cursor.nix-config.sbx-helper
+sbxa claude -- --continue                       # forward args to the agent
+sbxa claude -- -p "run the tests and fix failures"
 ```
+
+Anything after `--` is passed through as `sbx run ... -- AGENT_ARGS`. This applies on both create and attach, so `sbxa claude -- --continue` resumes the last session in an existing sandbox.
 
 Names look like `cursor.nix-config.sbx-helper` (`{agent}.` + path with `/` → `.`). Under `$HOME`, the path is home-relative; outside `$HOME`, it is root-relative (leading `/` stripped). If a sandbox with that name already exists (`sbx ls --json`), `sbxa` attaches with `sbx run --name`; otherwise it creates with the matching `nix-agent:*` template and stacked kits:
 
@@ -93,3 +97,26 @@ SBXA_KIT=~/nix-config/sandboxes/kits/nix sbxa cursor
 ```
 
 Kits only apply at create time; attach ignores `--kit` / `SBXA_EXTRA_KITS`. There is no auto-prune; use `sbxa ls` / `sbxa rm` explicitly.
+
+### Clone mode
+
+Direct mode bind-mounts the workspace. On a linked worktree of a bare repo (`~/nix-config/.bare` + `~/nix-config/<branch>`) only the worktree directory is mounted, so the `.git` pointer file cannot resolve and the agent has no git at all. `--clone` switches to [sbx clone mode](https://docs.docker.com/ai/sandboxes/workflows/git/): the sandbox gets a private full clone, the host repo is mounted read-only at `/run/sandbox/source`, and the agent can branch and commit freely. Commits stay in the sandbox until you fetch them through the `sandbox-<name>` remote that sbx registers in the host repo.
+
+```bash
+cd ~/nix-config/main
+sbxa --clone claude                                   # create-or-attach claude-clone.nix-config.main
+sbxa --clone claude -- -p "create branch feat/x, implement ..., commit"
+sbxa fetch claude                                     # git fetch sandbox-claude-clone.nix-config.main
+git checkout -b feat/x sandbox-claude-clone.nix-config.main/feat/x
+sbxa name --clone claude                              # print the clone-mode name
+sbxa rm --clone claude                                # remove it (also drops the sandbox-* remote)
+```
+
+Clone sandboxes are named `{agent}-clone.{slug}`, so a direct and a clone sandbox for the same workspace coexist and attach independently. `sbxa fetch` implies `--clone`; it fetches the remote and lists `sandbox-<name>/*` branches. Remotes live in the shared git config, so fetching works from any worktree of the bare repo.
+
+Notes:
+
+- `--clone` is a create-time flag. To switch modes, `sbxa rm` and recreate.
+- The remote is only reachable while the sandbox runs; `sbx stop` breaks `sbxa fetch` until the sandbox starts again. sbx rewrites the remote URL on restart.
+- Ask the agent to start each task on its own branch. One clone sandbox can hold several branches or worktrees for parallel tasks.
+- sbx clones from the read-only mount of the workspace alone. On a linked worktree `sbxa` warns before creating; if the clone fails, point `--clone` at the main checkout.

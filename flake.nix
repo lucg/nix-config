@@ -45,7 +45,7 @@
       inputs.nixpkgs.follows = "nixpkgs";
     };
     gh-worktree = {
-      url = "github:zmre/gh-worktree/20f8cbe9e0a2abba22db8fd0a70555ff05a82384";
+      url = "github:lucg/gh-worktree/b944629d22c2caa2595a9b0c2a1f2f4658a14810";
       inputs.nixpkgs.follows = "nixpkgs";
     };
   };

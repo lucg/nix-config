@@ -11,6 +11,7 @@ in
     name = "sbxa";
     runtimeInputs = with super; [
       coreutils
+      git
       gnugrep
       gnused
       jq
