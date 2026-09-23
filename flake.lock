@@ -68,13 +68,13 @@
       "locked": {
         "lastModified": 1790101594,
         "narHash": "sha256-qmFoQR1k1VgFOekfWy1LzQfXisjCbOeBOiAfQDwfmxI=",
-        "owner": "zmre",
+        "owner": "lucg",
         "repo": "gh-worktree",
         "rev": "b944629d22c2caa2595a9b0c2a1f2f4658a14810",
         "type": "github"
       },
       "original": {
-        "owner": "zmre",
+        "owner": "lucg",
         "repo": "gh-worktree",
         "rev": "b944629d22c2caa2595a9b0c2a1f2f4658a14810",
         "type": "github"
