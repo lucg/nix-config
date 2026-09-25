@@ -37,6 +37,7 @@ with pkgs;
   meslo-lgs-nf
   pandoc
   poppler-utils
+  viu
 
   # Node.js development tools
   # nodePackages.npm # globally install npm
