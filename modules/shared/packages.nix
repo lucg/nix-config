@@ -94,6 +94,9 @@ with pkgs;
 
   # LaTeX
   texlive.combined.scheme-full
+
+  # CAD
+  openscad
 ]
 ++ (with pkgs.unstable; [
   # Fast-moving media-related packages
