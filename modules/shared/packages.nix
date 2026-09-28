@@ -15,7 +15,6 @@ with pkgs;
   zip
   nixfmt
   yubikey-manager
-  tailscale
   mosh
 
   # Encryption and security tools
