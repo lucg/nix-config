@@ -10,6 +10,15 @@ FLAKE_SYSTEM="darwinConfigurations.${SYSTEM_TYPE}.system"
 
 export NIXPKGS_ALLOW_UNFREE=1
 
+# Wake the on-demand Linux builder so the first remote build
+# does not race the VM's cold boot. The nix daemon connects as root,
+# so the warm-up must too.
+if [ -f /etc/ssh/ssh_config.d/100-rosetta-builder.conf ]; then
+  echo "${YELLOW}Waking rosetta-builder...${NC}"
+  sudo ssh -o BatchMode=yes -o ConnectTimeout=180 rosetta-builder true \
+    || echo "${RED}rosetta-builder did not answer; Linux builds will fail${NC}"
+fi
+
 echo "${YELLOW}Starting build...${NC}"
 nix --extra-experimental-features 'nix-command flakes' build .#$FLAKE_SYSTEM $@
 
