@@ -11,8 +11,6 @@ in
     ../../modules/shared
   ];
 
-  ids.gids.nixbld = 30000;
-
   nix = {
     package = pkgs.nix;
 
@@ -49,7 +47,7 @@ in
   system = {
     checks.verifyNixPath = false;
     primaryUser = user;
-    stateVersion = 5;
+    stateVersion = 7;
 
     defaults = {
       NSGlobalDomain = {
