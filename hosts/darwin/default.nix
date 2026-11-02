@@ -87,5 +87,9 @@ in
     pam.services.sudo_local.touchIdAuth = true;
   };
 
-  services.tailscale.enable = true;
+  services.tailscale = {
+    enable = true;
+    # Track unstable so the daemon and CLI get newer releases than the stable branch ships.
+    package = pkgs.unstable.tailscale;
+  };
 }
