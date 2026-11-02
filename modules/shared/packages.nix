@@ -85,7 +85,6 @@ with pkgs;
 
   # Hardware dev
   iverilog
-  verilator
   surfer
   openfpgaloader
   pulseview
@@ -104,7 +103,12 @@ with pkgs;
 
   # Fast-moving development tools
   vscode
-  docker-sbx
+  (docker-sbx.overrideAttrs (_: {
+    doInstallCheck = false;
+  }))
   claude-code
   cursor-cli
+
+  # Temporarily here to avoid build errors
+  verilator
 ])
