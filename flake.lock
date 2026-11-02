@@ -165,22 +165,6 @@
         "type": "github"
       }
     },
-    "homebrew-verible": {
-      "flake": false,
-      "locked": {
-        "lastModified": 1752482300,
-        "narHash": "sha256-zoNVpoSqu5Fx6qeAKPEk2NdCMpTML2YGnHfiRQGT1yY=",
-        "owner": "chipsalliance",
-        "repo": "homebrew-verible",
-        "rev": "7a0be059a386b0bc99af71a5cc11392748a6fbf8",
-        "type": "github"
-      },
-      "original": {
-        "owner": "chipsalliance",
-        "repo": "homebrew-verible",
-        "type": "github"
-      }
-    },
     "nix-homebrew": {
       "inputs": {
         "brew-src": "brew-src"
@@ -261,7 +245,6 @@
         "homebrew-cask": "homebrew-cask",
         "homebrew-core": "homebrew-core",
         "homebrew-riscv": "homebrew-riscv",
-        "homebrew-verible": "homebrew-verible",
         "nix-homebrew": "nix-homebrew",
         "nix-rosetta-builder": "nix-rosetta-builder",
         "nixpkgs": "nixpkgs",

@@ -90,6 +90,7 @@ with pkgs;
   pulseview
   yosys
   klayout
+  verible
 
   # LaTeX
   texlive.combined.scheme-full
