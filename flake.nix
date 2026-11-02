@@ -32,10 +32,6 @@
       url = "github:riscv/homebrew-riscv";
       flake = false;
     };
-    homebrew-verible = {
-      url = "github:chipsalliance/homebrew-verible";
-      flake = false;
-    };
     disko = {
       url = "github:nix-community/disko";
       inputs.nixpkgs.follows = "nixpkgs";
@@ -59,7 +55,6 @@
       homebrew-core,
       homebrew-cask,
       homebrew-riscv,
-      homebrew-verible,
       home-manager,
       nixpkgs,
       nixpkgs-unstable,
@@ -166,13 +161,11 @@
                   "homebrew/homebrew-cask" = homebrew-cask;
                   "homebrew/homebrew-bundle" = homebrew-bundle;
                   "riscv/homebrew-riscv" = homebrew-riscv;
-                  "chipsalliance/homebrew-verible" = homebrew-verible;
                 };
                 mutableTaps = false;
                 autoMigrate = true;
                 trust.formulae = [
                   "riscv/riscv/riscv-gnu-toolchain"
-                  "chipsalliance/verible/verible"
                 ];
               };
             }
