@@ -55,7 +55,7 @@ in
       "whatsapp-messenger" = 310633997;
       "copilot" = 1447330651;
       "vimlike" = 1584519802;
-      "pages" = 409201541;
+      "pages" = 361309726;
       "amphetamine" = 937984704;
       "wifi-explorer-scanner" = 494803304;
     };
